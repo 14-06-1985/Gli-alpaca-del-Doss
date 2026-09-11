@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione Allevamento Alpaca PRO</title>
+    <style>
+        :root {
+            --primary: #4a7c59;
+            --secondary: #8d5b4c;
+            --alert: #d9534f;
+            --warning: #f0ad4e;
+            --background: #f4f6f0;
+            --card: #ffffff;
+            --text: #333333;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--background);
+            color: var(--text);
+            margin: 0;
+            padding: 15px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        h1 { text-align: center; color: var(--primary); margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #666; font-size: 14px; margin-bottom: 20px; }
+
+        .card {
+            background: var(--card);
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        form {
+            display: grid;
+            gap: 10px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        label { font-size: 12px; font-weight: bold; color: #555; }
+
+        input, select, button, textarea {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-size: 14px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:hover { opacity: 0.9; }
+
+        .btn-secondary { background-color: var(--secondary); }
+        .btn-backup { background-color: #3b5998; }
+        .btn-delete { background-color: var(--alert); padding: 5px 10px; font-size: 12px; width: auto; }
+
+        .flex-buttons { display: flex; gap: 10px; }
+
+        .alpaca-item {
+            border-left: 5px solid var(--primary);
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #fff;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .alpaca-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+
+        .section-box {
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        .section-box h4 { margin: 0 0 8px 0; color: var(--secondary); font-size: 13px; }
+
+        .alert-card {
+            border-left: 5px solid var(--warning);
+            background: #fff8e1;
+        }
+
+        .alert-item {
+            padding: 6px 0;
+            border-bottom: 1px dashed #e0e0e0;
+            font-size: 13px;
+        }
+        .alert-item:last-child { border-bottom: none; }
+
+        ul { margin: 0; padding-left: 20px; font-size: 12px; }
+        .badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 11px; background: #e0e0e0; }
+        .badge-m { background: #d0e8f2; }
+        .badge-f { background: #f2d0e0; }
+    </style>
+</head>
+<body>
+
+    <h1>🦙 Gestione Alpaca PRO</h1>
+    <div class="subtitle">Anagrafica, Pedigree, Riproduzione e Registro Sanitario</div>
+
+    <!-- Pulsanti Backup / Export -->
+    <div class="card">
+        <div class="flex-buttons">
+            <button onclick="esportaCSV()" class="btn-secondary">📊 Esporta in Excel / CSV</button>
+            <button onclick="esportaJSON()" class="btn-backup">💾 Salvataggio Backup</button>
+        </div>
+    </div>
+
+    <!-- Modulo Scadenze Imminenti (Prossimi 30 giorni) -->
+    <div class="card alert-card">
+        <h3 style="margin: 0 0 10px 0; color: #b78103;">🔔 Scadenze & Eventi nei Prossimi 30 Giorni</h3>
+        <div id="scadenzeList">Nessuna scadenza prevista nei prossimi 30 giorni.</div>
+    </div>
+
+    <!-- Form Nuovo Alpaca -->
+    <div class="card">
+        <h3>➕ Registra Nuovo Esemplare</h3>
+        <form id="alpacaForm">
+            <div class="form-group">
+                <label>Nome o Crotale/ID *</label>
+                <input type="text" id="nome" placeholder="Es. Paco" required>
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Sesso *</label>
+                    <select id="sesso" required>
+                        <option value="">Seleziona...</option>
+                        <option value="Macho">Macho (Maschio)</option>
+                        <option value="Hembra">Hembra (Femmina)</option>
+                        <option value="Castrato">Castrato</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Data Nascita *</label>
+                    <input type="date" id="dataNascita" required>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Codice Microchip</label>
+                    <input type="text" id="microchip" placeholder="Es. 981000000123456">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Colore Mantello</label>
+                    <input type="text" id="colore" placeholder="Es. Fawn / Bianco">
+                </div>
+            </div>
+
+            <!-- Sezione Pedigree -->
+            <div style="display: flex; gap: 10px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Padre (Macho)</label>
+                    <select id="padreId">
+                        <option value="">Sconosciuto / Esterno</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Madre (Hembra)</label>
+                    <select id="madreId">
+                        <option value="">Sconosciuta / Esterna</option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit">Salva in Anagrafica</button>
+        </form>
+    </div>
+
+    <!-- Lista Alpaca -->
+    <div class="card">
+        <h3>📋 Registro Allevamento (<span id="count">0</span>)</h3>
+        <div id="alpacaList"></div>
+    </div>
+
+    <script>
+        let alpacaData = JSON.parse(localStorage.getItem('alpacaDataPro')) || [];
+
+        const form = document.getElementById('alpacaForm');
+        const listContainer = document.getElementById('alpacaList');
+        const countSpan = document.getElementById('count');
+        const scadenzeContainer = document.getElementById('scadenzeList');
+
+        // Calcolo Data Presunta Parto (+345 giorni)
+        function calcolaDataParto(dataAccoppiamento) {
+            if (!dataAccoppiamento) return null;
+            let d = new Date(dataAccoppiamento);
+            d.setDate(d.getDate() + 345);
+            return d.toISOString().split('T')[0];
+        }
+
+        // Popola i menu a tendina per selezione Padre e Madre
+        function aggiornaSelectGenitori() {
+            const padreSelect = document.getElementById('padreId');
+            const madreSelect = document.getElementById('madreId');
+
+            padreSelect.innerHTML = '<option value="">Sconosciuto / Esterno</option>';
+            madreSelect.innerHTML = '<option value="">Sconosciuta / Esterna</option>';
+
+            alpacaData.forEach(a => {
+                if (a.sesso === 'Macho' || a.sesso === 'Castrato') {
+                    padreSelect.innerHTML += `<option value="${a.nome}">${a.nome}</option>`;
+                }
+                if (a.sesso === 'Hembra') {
+                    madreSelect.innerHTML += `<option value="${a.nome}">${a.nome}</option>`;
+                }
+            });
+        }
+
+        // Controllo Scadenze (Parti e Interventi Sanitari nei prossimi 30 giorni)
+        function controllaScadenze() {
+            scadenzeContainer.innerHTML = '';
+            const oggi = new Date();
+            const limite30gg = new Date();
+            limite30gg.setDate(oggi.getDate() + 30);
+
+            let eventi = [];
+
+            alpacaData.forEach(a => {
+                // Controllo Parti Presunti
+                if (a.sesso === 'Hembra' && a.dataAccoppiamento) {
+                    const dataPartoStr = calcolaDataParto(a.dataAccoppiamento);
+                    const dataParto = new Date(dataPartoStr);
+                    if (dataParto >= oggi && dataParto <= limite30gg) {
+                        eventi.push(`🍼 <strong>${a.nome}</strong>: Parto presunto il <strong>${dataPartoStr}</strong>`);
+                    }
+                }
+
+                // Controllo Prossime Scadenze Sanitarie
+                if (a.interventi) {
+                    a.interventi.forEach(i => {
+                        if (i.prossimaScadenza) {
+                            const dataScad = new Date(i.prossimaScadenza);
+                            if (dataScad >= oggi && dataScad <= limite30gg) {
+                                eventi.push(`🩺 <strong>${a.nome}</strong>: Scadenza ${i.tipo} (${i.note}) il <strong>${i.prossimaScadenza}</strong>`);
+                            }
+                        }
+                    });
+                }
+            });
+
+            if (eventi.length === 0) {
+                scadenzeContainer.innerHTML = '<div style="font-size: 13px; color: #666;">Nessuna scadenza o parto previsto nei prossimi 30 giorni.</div>';
+            } else {
+                eventi.forEach(e => {
+                    scadenzeContainer.innerHTML += `<div class="alert-item">${e}</div>`;
+                });
+            }
+        }
+
+        // Renderizza la lista
+        function renderAlpaca() {
+            listContainer.innerHTML = '';
+            countSpan.textContent = alpacaData.length;
+            aggiornaSelectGenitori();
+            controllaScadenze();
+
+            alpacaData.forEach((alpaca, index) => {
+                const item = document.createElement('div');
+                item.className = 'alpaca-item';
+                
+                const badgeClass = alpaca.sesso === 'Macho' ? 'badge-m' : (alpaca.sesso === 'Hembra' ? 'badge-f' : '');
+
+                let riproduzioneHTML = '';
+                if (alpaca.sesso === 'Hembra') {
+                    let dataPartoPresunta = alpaca.dataAccoppiamento ? calcolaDataParto(alpaca.dataAccoppiamento) : 'N/D';
+                    riproduzioneHTML = `
+                        <div class="section-box">
+                            <h4>💕 Riproduzione & Gestazione</h4>
+                            <div style="display: flex; gap: 10px; align-items: flex-end;">
+                                <div class="form-group" style="flex: 1;">
+                                    <label>Ultimo Accoppiamento</label>
+                                    <input type="date" value="${alpaca.dataAccoppiamento || ''}" onchange="aggiornaAccoppiamento(${index}, this.value)">
+                                </div>
+                                <div class="form-group" style="flex: 1;">
+                                    <label>Data Presunta Parto (+345 gg)</label>
+                                    <input type="text" value="${dataPartoPresunta}" readonly style="background: #e9ecef;">
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                let interventiLista = (alpaca.interventi || []).map(i => {
+                    let scadStr = i.prossimaScadenza ? ` | <span style="color:#d9534f;">Prossimo richiamo: ${i.prossimaScadenza}</span>` : '';
+                    return `<li><strong>${i.data}</strong> [${i.tipo}]: ${i.note}${scadStr}</li>`;
+                }).join('');
+
+                item.innerHTML = `
+                    <div class="alpaca-header">
+                        <div>
+                            <strong style="font-size: 16px;">${alpaca.nome}</strong> 
+                            <span class="badge ${badgeClass}">${alpaca.sesso}</span>
+                        </div>
+                        <button class="btn-delete" onclick="eliminaAlpaca(${index})">Elimina</button>
+                    </div>
+
+                    <div class="details-grid">
+                        <div><strong>Microchip:</strong> ${alpaca.microchip || 'N/D'}</div>
+                        <div><strong>Nascita:</strong> ${alpaca.dataNascita}</div>
+                        <div><strong>Colore:</strong> ${alpaca.colore || 'N/D'}</div>
+                        <div><strong>Padre:</strong> ${alpaca.padreId || 'N/D'}</div>
+                        <div><strong>Madre:</strong> ${alpaca.madreId || 'N/D'}</div>
+                    </div>
+
+                    ${riproduzioneHTML}
+
+                    <div class="section-box">
+                        <h4>🩺 Registro Sanitario & Tosatura</h4>
+                        <ul>${interventiLista || '<li>Nessun intervento registrato.</li>'}</ul>
+                        <details style="margin-top: 8px;">
+                            <summary style="font-size: 12px; cursor: pointer; color: var(--primary);">+ Aggiungi Intervento / Richiamo</summary>
+                            <div style="display: grid; gap: 8px; margin-top: 8px;">
+                                <div style="display: flex; gap: 8px;">
+                                    <div class="form-group" style="flex: 1;">
+                                        <label>Data Esecuzione</label>
+                                        <input type="date" id="san_data_${index}" value="${new Date().toISOString().split('T')[0]}">
+                                    </div>
+                                    <div class="form-group" style="flex: 1;">
+                                        <label>Data Prossimo Richiamo (Opzionale)</label>
+                                        <input type="date" id="san_scad_${index}">
+                                    </div>
+                                </div>
+                                <select id="san_tipo_${index}">
+                                    <option value="Vaccino">Vaccino</option>
+                                    <option value="Sverminazione">Sverminazione</option>
+                                    <option value="Tosatura">Tosatura / Lana</option>
+                                    <option value="Visita Veterinaria">Visita Veterinaria</option>
+                                </select>
+                                <input type="text" id="san_note_${index}" placeholder="Dettagli (es. Nome farmaco, Peso lana)">
+                                <button type="button" onclick="aggiungiIntervento(${index})">Salva Intervento</button>
+                            </div>
+                        </details>
+                    </div>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+
+        // Event listener Form Aggiunta
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const nuovo = {
+                nome: document.getElementById('nome').value,
+                sesso: document.getElementById('sesso').value,
+                dataNascita: document.getElementById('dataNascita').value,
+                microchip: document.getElementById('microchip').value,
+                colore: document.getElementById('colore').value,
+                padreId: document.getElementById('padreId').value,
+                madreId: document.getElementById('madreId').value,
+                dataAccoppiamento: '',
+                interventi: []
+            };
+
+            alpacaData.push(nuovo);
+            salvaEAggiorna();
+            form.reset();
+        });
+
+        function aggiornaAccoppiamento(index, data) {
+            alpacaData[index].dataAccoppiamento = data;
+            salvaEAggiorna();
+        }
+
+        function aggiungiIntervento(index) {
+            const dataInput = document.getElementById(`san_data_${index}`).value;
+            const scadInput = document.getElementById(`san_scad_${index}`).value;
+            const tipoInput = document.getElementById(`san_tipo_${index}`).value;
+            const noteInput = document.getElementById(`san_note_${index}`).value;
+
+            if (!dataInput) return alert("Inserisci una data valida.");
+
+            if (!alpacaData[index].interventi) alpacaData[index].interventi = [];
+
+            alpacaData[index].interventi.push({
+                data: dataInput,
+                prossimaScadenza: scadInput || null,
+                tipo: tipoInput,
+                note: noteInput || '-'
+            });
+
+            salvaEAggiorna();
+        }
+
+        function eliminaAlpaca(index) {
+            if (confirm("Confermi di voler eliminare questo esemplare?")) {
+                alpacaData.splice(index, 1);
+                salvaEAggiorna();
+            }
+        }
+
+        function salvaEAggiorna() {
+            localStorage.setItem('alpacaDataPro', JSON.stringify(alpacaData));
+            renderAlpaca();
+        }
+
+        // Esportazione in Excel / CSV
+        function esportaCSV() {
+            if (alpacaData.length === 0) return alert("Nessun dato da esportare.");
+
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Nome;Sesso;Data Nascita;Microchip;Colore;Padre;Madre;Ultimo Accoppiamento;Data Presunta Parto\n";
+
+            alpacaData.forEach(a => {
+                let parto = a.dataAccoppiamento ? calcolaDataParto(a.dataAccoppiamento) : '';
+                csvContent += `"${a.nome}";"${a.sesso}";"${a.dataNascita}";"${a.microchip || ''}";"${a.colore || ''}";"${a.padreId || ''}";"${a.madreId || ''}";"${a.dataAccoppiamento || ''}";"${parto}"\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `allevamento_alpaca_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Esportazione Backup JSON
+        function esportaJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(alpacaData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `backup_alpaca_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        // Avvio iniziale
+        renderAlpaca();
+    </script>
+</body>
+</html>
