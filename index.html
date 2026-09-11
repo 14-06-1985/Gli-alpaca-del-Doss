@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestione Allevamento Alpaca PRO</title>
+    <title>Gli Alpaca del Doss - Cloud</title>
     <style>
         :root {
             --primary: #4a7c59;
@@ -36,6 +36,18 @@
             border-radius: 10px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
+
+        .status-badge {
+            text-align: center;
+            font-size: 12px;
+            padding: 8px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            background: #e2e3e5;
+            color: #383d41;
+            font-weight: bold;
+        }
+        .status-online { background: #d4edda; color: #155724; }
 
         form {
             display: grid;
@@ -77,7 +89,6 @@
 
         .flex-buttons { display: flex; gap: 10px; }
 
-        /* Stile Tendina Alpaca accordion */
         .alpaca-details {
             border-left: 5px solid var(--primary);
             margin-bottom: 10px;
@@ -100,9 +111,7 @@
             background: #fff;
         }
 
-        .alpaca-summary::-webkit-details-marker {
-            display: none;
-        }
+        .alpaca-summary::-webkit-details-marker { display: none; }
 
         .alpaca-body {
             padding: 15px;
@@ -150,8 +159,10 @@
 </head>
 <body>
 
-    <h1>🦙 Gestione Alpaca PRO</h1>
-    <div class="subtitle">Anagrafica, Pedigree, Vaccini Annuali e Registro Sanitario</div>
+    <h1>🦙 Gli Alpaca del Doss</h1>
+    <div class="subtitle">Anagrafica, Pedigree, Vaccini e Gestione Sincronizzata</div>
+
+    <div id="statusIndicator" class="status-badge">Connessione al Cloud in corso...</div>
 
     <!-- Pulsanti Backup / Export -->
     <div class="card">
@@ -219,7 +230,7 @@
                 </div>
             </div>
 
-            <button type="submit">Salva in Anagrafica</button>
+            <button type="submit">Salva in Anagrafica Cloud</button>
         </form>
     </div>
 
@@ -229,15 +240,47 @@
         <div id="alpacaList"></div>
     </div>
 
+    <!-- SDK Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
     <script>
-        let alpacaData = JSON.parse(localStorage.getItem('alpacaDataPro')) || [];
+        // Configurazione delle chiavi personali per "Gli alpaca del Doss"
+        const firebaseConfig = {
+            apiKey: "AIzaSyAjr4_FqO0J3UL4ylFem3jnj4lsD58aTv0",
+            authDomain: "gli-alpaca-del-doss.firebaseapp.com",
+            projectId: "gli-alpaca-del-doss",
+            storageBucket: "gli-alpaca-del-doss.firebasestorage.app",
+            messagingSenderId: "1037494791027",
+            appId: "1:1037494791027:web:4c7cc8167f55d54389f306"
+        };
+
+        // Inizializzazione Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        let alpacaData = [];
 
         const form = document.getElementById('alpacaForm');
         const listContainer = document.getElementById('alpacaList');
         const countSpan = document.getElementById('count');
         const scadenzeContainer = document.getElementById('scadenzeList');
+        const statusIndicator = document.getElementById('statusIndicator');
 
-        // Calcolo Data Presunta Parto (+345 giorni)
+        // Ascolto sincronizzato in tempo reale
+        db.collection("alpaca").onSnapshot((snapshot) => {
+            alpacaData = [];
+            snapshot.forEach((doc) => {
+                alpacaData.push({ id: doc.id, ...doc.data() });
+            });
+            statusIndicator.textContent = "🟢 Sincronizzato con il Cloud (Gli Alpaca del Doss)";
+            statusIndicator.className = "status-badge status-online";
+            renderAlpaca();
+        }, (error) => {
+            console.error("Errore sincronizzazione Cloud: ", error);
+            statusIndicator.textContent = "⚠️ In attesa di attivazione Firestore... (Verifica Step 1)";
+        });
+
         function calcolaDataParto(dataAccoppiamento) {
             if (!dataAccoppiamento) return null;
             let d = new Date(dataAccoppiamento);
@@ -245,12 +288,10 @@
             return d.toISOString().split('T')[0];
         }
 
-        // Popola i menu a tendina per selezione Macho ed Hembra
         function aggiornaSelectGenitori() {
             const machiList = alpacaData.filter(a => a.sesso === 'Macho' || a.sesso === 'Castrato');
             const hembreList = alpacaData.filter(a => a.sesso === 'Hembra');
 
-            // Popola Select Form Principale
             const padreSelect = document.getElementById('padreId');
             const madreSelect = document.getElementById('madreId');
 
@@ -264,7 +305,6 @@
             }
         }
 
-        // Controllo Scadenze (Parti e Vaccini nei prossimi 30 giorni o Scaduti)
         function controllaScadenze() {
             scadenzeContainer.innerHTML = '';
             const oggi = new Date();
@@ -275,8 +315,7 @@
 
             let eventi = [];
 
-            alpacaData.forEach((a, alpacaIndex) => {
-                // Controllo Parti Presunti
+            alpacaData.forEach((a) => {
                 if (a.sesso === 'Hembra' && a.dataAccoppiamento) {
                     const dataPartoStr = calcolaDataParto(a.dataAccoppiamento);
                     const dataParto = new Date(dataPartoStr);
@@ -286,14 +325,13 @@
                     }
                 }
 
-                // Controllo Vaccini
                 if (a.vaccini) {
                     a.vaccini.forEach((v, vacIndex) => {
                         if (v.scadenza) {
                             const dataScad = new Date(v.scadenza);
                             if (dataScad <= limite30gg) {
                                 let labelStato = dataScad < oggi ? '<span style="color:red; font-weight:bold;">SCADUTO</span>' : 'in scadenza';
-                                eventi.push(`💉 <strong>${a.nome}</strong>: Vaccino <strong>${v.nome}</strong> ${labelStato} (${v.scadenza}) <button class="btn-renew" onclick="rinnovaVaccino(${alpacaIndex}, ${vacIndex})">➕ Rinnova 1 Anno</button>`);
+                                eventi.push(`💉 <strong>${a.nome}</strong>: Vaccino <strong>${v.nome}</strong> ${labelStato} (${v.scadenza}) <button class="btn-renew" onclick="rinnovaVaccino('${a.id}', ${vacIndex})">➕ Rinnova 1 Anno</button>`);
                             }
                         }
                     });
@@ -309,7 +347,6 @@
             }
         }
 
-        // Renderizza la lista con tendine richiudibili
         function renderAlpaca() {
             listContainer.innerHTML = '';
             countSpan.textContent = alpacaData.length;
@@ -317,7 +354,7 @@
 
             const machiList = alpacaData.filter(a => a.sesso === 'Macho' || a.sesso === 'Castrato');
 
-            alpacaData.forEach((alpaca, index) => {
+            alpacaData.forEach((alpaca) => {
                 const item = document.createElement('details');
                 item.className = 'alpaca-details';
                 
@@ -339,11 +376,11 @@
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px;">
                                 <div class="form-group">
                                     <label>Ultimo Accoppiamento</label>
-                                    <input type="date" value="${alpaca.dataAccoppiamento || ''}" onchange="aggiornaAccoppiamento(${index}, this.value, null)">
+                                    <input type="date" value="${alpaca.dataAccoppiamento || ''}" onchange="aggiornaAccoppiamento('${alpaca.id}', this.value, null)">
                                 </div>
                                 <div class="form-group">
                                     <label>Stallone (Padre)</label>
-                                    <select onchange="aggiornaAccoppiamento(${index}, null, this.value)">
+                                    <select onchange="aggiornaAccoppiamento('${alpaca.id}', null, this.value)">
                                         ${opzioniPadre}
                                     </select>
                                 </div>
@@ -356,12 +393,10 @@
                     `;
                 }
 
-                // Lista Vaccini
                 let vacciniLista = (alpaca.vaccini || []).map((v, vIdx) => {
-                    return `<li>💉 <strong>${v.nome}</strong> - Fatto il: ${v.data} | <span style="color:#d9534f; font-weight:bold;">Scadenza: ${v.scadenza}</span> <button class="btn-renew" onclick="rinnovaVaccino(${index}, ${vIdx})">➕ Rinnova +1 Anno</button></li>`;
+                    return `<li>💉 <strong>${v.nome}</strong> - Fatto il: ${v.data} | <span style="color:#d9534f; font-weight:bold;">Scadenza: ${v.scadenza}</span> <button class="btn-renew" onclick="rinnovaVaccino('${alpaca.id}', ${vIdx})">➕ Rinnova +1 Anno</button></li>`;
                 }).join('');
 
-                // Lista Altri Interventi
                 let interventiLista = (alpaca.interventi || []).map(i => {
                     return `<li><strong>${i.data}</strong> [${i.tipo}]: ${i.note}</li>`;
                 }).join('');
@@ -381,7 +416,7 @@
                     <div class="alpaca-body">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                             <span style="font-size: 12px; color: #666;">Scheda Dettagliata</span>
-                            <button class="btn-delete" onclick="eliminaAlpaca(${index})">Elimina Esemplare</button>
+                            <button class="btn-delete" onclick="eliminaAlpaca('${alpaca.id}')">Elimina Esemplare</button>
                         </div>
 
                         <div class="details-grid">
@@ -394,40 +429,38 @@
 
                         ${riproduzioneHTML}
 
-                        <!-- Sezione Specifica Vaccini Annuali -->
                         <div class="section-box" style="background: #f0f7f4; border: 1px solid #c8e6c9;">
                             <h4>💉 Vaccini & Richiami Annuali</h4>
                             <ul>${vacciniLista || '<li>Nessun vaccino registrato.</li>'}</ul>
                             <details style="margin-top: 8px;">
                                 <summary style="font-size: 12px; cursor: pointer; color: var(--primary); font-weight:bold;">+ Registra Nuovo Vaccino</summary>
                                 <div style="display: grid; gap: 8px; margin-top: 8px;">
-                                    <input type="text" id="vac_nome_${index}" placeholder="Nome Vaccino (es. Enterotossemia)">
+                                    <input type="text" id="vac_nome_${alpaca.id}" placeholder="Nome Vaccino (es. Enterotossemia)">
                                     <div style="display: flex; gap: 8px;">
                                         <div class="form-group" style="flex: 1;">
                                             <label>Data Esecuzione</label>
-                                            <input type="date" id="vac_data_${index}" value="${new Date().toISOString().split('T')[0]}">
+                                            <input type="date" id="vac_data_${alpaca.id}" value="${new Date().toISOString().split('T')[0]}">
                                         </div>
                                     </div>
-                                    <button type="button" onclick="aggiungiVaccino(${index})">Salva Vaccino (Scadenza 1 anno)</button>
+                                    <button type="button" onclick="aggiungiVaccino('${alpaca.id}')">Salva Vaccino (Scadenza 1 anno)</button>
                                 </div>
                             </details>
                         </div>
 
-                        <!-- Sezione Altri Interventi Sanitari -->
                         <div class="section-box">
                             <h4>🩺 Altri Interventi (Sverminazione, Tosatura, Visite)</h4>
                             <ul>${interventiLista || '<li>Nessun intervento registrato.</li>'}</ul>
                             <details style="margin-top: 8px;">
                                 <summary style="font-size: 12px; cursor: pointer; color: var(--primary);">+ Aggiungi Intervento Sanitario</summary>
                                 <div style="display: grid; gap: 8px; margin-top: 8px;">
-                                    <input type="date" id="san_data_${index}" value="${new Date().toISOString().split('T')[0]}">
-                                    <select id="san_tipo_${index}">
+                                    <input type="date" id="san_data_${alpaca.id}" value="${new Date().toISOString().split('T')[0]}">
+                                    <select id="san_tipo_${alpaca.id}">
                                         <option value="Sverminazione">Sverminazione</option>
                                         <option value="Tosatura">Tosatura / Lana</option>
                                         <option value="Visita Veterinaria">Visita Veterinaria</option>
                                     </select>
-                                    <input type="text" id="san_note_${index}" placeholder="Dettagli (es. Nome farmaco, Peso lana)">
-                                    <button type="button" onclick="aggiungiIntervento(${index})">Salva Intervento</button>
+                                    <input type="text" id="san_note_${alpaca.id}" placeholder="Dettagli (es. Nome farmaco, Peso lana)">
+                                    <button type="button" onclick="aggiungiIntervento('${alpaca.id}')">Salva Intervento</button>
                                 </div>
                             </details>
                         </div>
@@ -439,43 +472,6 @@
             controllaScadenze();
         }
 
-        // Funzione Aggiungi Vaccino
-        function aggiungiVaccino(index) {
-            const nomeVac = document.getElementById(`vac_nome_${index}`).value;
-            const dataVac = document.getElementById(`vac_data_${index}`).value;
-
-            if (!nomeVac || !dataVac) return alert("Inserisci nome del vaccino e data.");
-
-            let d = new Date(dataVac);
-            d.setFullYear(d.getFullYear() + 1);
-            let scadenzaVac = d.toISOString().split('T')[0];
-
-            if (!alpacaData[index].vaccini) alpacaData[index].vaccini = [];
-
-            alpacaData[index].vaccini.push({
-                nome: nomeVac,
-                data: dataVac,
-                scadenza: scadenzaVac
-            });
-
-            salvaEAggiorna();
-        }
-
-        // Funzione Tastino Rinnova +1 Anno
-        function rinnovaVaccino(alpacaIdx, vacIdx) {
-            const oggiStr = new Date().toISOString().split('T')[0];
-            
-            let d = new Date();
-            d.setFullYear(d.getFullYear() + 1);
-            let nuovaScadenzaStr = d.toISOString().split('T')[0];
-
-            alpacaData[alpacaIdx].vaccini[vacIdx].data = oggiStr;
-            alpacaData[alpacaIdx].vaccini[vacIdx].scadenza = nuovaScadenzaStr;
-
-            salvaEAggiorna();
-        }
-
-        // Event listener Form Aggiunta Nuovo Alpaca
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             const nuovo = {
@@ -492,48 +488,70 @@
                 interventi: []
             };
 
-            alpacaData.push(nuovo);
-            salvaEAggiorna();
-            form.reset();
+            db.collection("alpaca").add(nuovo)
+            .then(() => form.reset())
+            .catch((error) => alert("Errore nel salvataggio: " + error));
         });
 
-        function aggiornaAccoppiamento(index, data, padre) {
-            if (data !== null) alpacaData[index].dataAccoppiamento = data;
-            if (padre !== null) alpacaData[index].padreAccoppiamento = padre;
-            salvaEAggiorna();
+        function aggiornaAccoppiamento(id, data, padre) {
+            let updateData = {};
+            if (data !== null) updateData.dataAccoppiamento = data;
+            if (padre !== null) updateData.padreAccoppiamento = padre;
+
+            db.collection("alpaca").doc(id).update(updateData);
         }
 
-        function aggiungiIntervento(index) {
-            const dataInput = document.getElementById(`san_data_${index}`).value;
-            const tipoInput = document.getElementById(`san_tipo_${index}`).value;
-            const noteInput = document.getElementById(`san_note_${index}`).value;
+        function aggiungiVaccino(id) {
+            const nomeVac = document.getElementById(`vac_nome_${id}`).value;
+            const dataVac = document.getElementById(`vac_data_${id}`).value;
+
+            if (!nomeVac || !dataVac) return alert("Inserisci nome del vaccino e data.");
+
+            let d = new Date(dataVac);
+            d.setFullYear(d.getFullYear() + 1);
+            let scadenzaVac = d.toISOString().split('T')[0];
+
+            let alpaca = alpacaData.find(a => a.id === id);
+            let vacciniAggiornati = alpaca.vaccini || [];
+            vacciniAggiornati.push({ nome: nomeVac, data: dataVac, scadenza: scadenzaVac });
+
+            db.collection("alpaca").doc(id).update({ vaccini: vacciniAggiornati });
+        }
+
+        function rinnovaVaccino(id, vacIdx) {
+            const oggiStr = new Date().toISOString().split('T')[0];
+            let d = new Date();
+            d.setFullYear(d.getFullYear() + 1);
+            let nuovaScadenzaStr = d.toISOString().split('T')[0];
+
+            let alpaca = alpacaData.find(a => a.id === id);
+            let vacciniAggiornati = [...alpaca.vaccini];
+            vacciniAggiornati[vacIdx].data = oggiStr;
+            vacciniAggiornati[vacIdx].scadenza = nuovaScadenzaStr;
+
+            db.collection("alpaca").doc(id).update({ vaccini: vacciniAggiornati });
+        }
+
+        function aggiungiIntervento(id) {
+            const dataInput = document.getElementById(`san_data_${id}`).value;
+            const tipoInput = document.getElementById(`san_tipo_${id}`).value;
+            const noteInput = document.getElementById(`san_note_${id}`).value;
 
             if (!dataInput) return alert("Inserisci una data valida.");
 
-            if (!alpacaData[index].interventi) alpacaData[index].interventi = [];
+            let alpaca = alpacaData.find(a => a.id === id);
+            let interventiAggiornati = alpaca.interventi || [];
+            interventiAggiornati.push({ data: dataInput, tipo: tipoInput, note: noteInput || '-' });
 
-            alpacaData[index].interventi.push({
-                data: dataInput,
-                tipo: tipoInput,
-                note: noteInput || '-'
-            });
-
-            salvaEAggiorna();
+            db.collection("alpaca").doc(id).update({ interventi: interventiAggiornati });
         }
 
-        function eliminaAlpaca(index) {
-            if (confirm("Confermi di voler eliminare questo esemplare?")) {
-                alpacaData.splice(index, 1);
-                salvaEAggiorna();
+        function eliminaAlpaca(id) {
+            if (confirm("Confermi di voler eliminare questo esemplare dal Cloud?")) {
+                db.collection("alpaca").doc(id).delete();
             }
         }
 
-        function salvaEAggiorna() {
-            localStorage.setItem('alpacaDataPro', JSON.stringify(alpacaData));
-            renderAlpaca();
-        }
-
-        // Esportazione in Excel / CSV
         function esportaCSV() {
             if (alpacaData.length === 0) return alert("Nessun dato da esportare.");
 
@@ -554,7 +572,6 @@
             document.body.removeChild(link);
         }
 
-        // Esportazione Backup JSON
         function esportaJSON() {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(alpacaData, null, 2));
             const downloadAnchor = document.createElement('a');
@@ -564,9 +581,6 @@
             downloadAnchor.click();
             downloadAnchor.remove();
         }
-
-        // Avvio iniziale
-        renderAlpaca();
     </script>
 </body>
 </html>
